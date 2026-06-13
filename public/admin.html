@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRÛLÉ CAFÉ — 관리자</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #111009; --surface: #1a1710; --border: #2e2b22;
+    --caramel: #c4883e; --cream: #f0e6d3; --muted: #6b6252;
+    --pending: #c4883e; --accepted: #4a9ebb; --completed: #5aab7a; --cancelled: #884444;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--cream); font-family:'DM Mono',monospace; min-height:100vh; }
+
+  /* HEADER */
+  header { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; border-bottom:1px solid var(--border); background:var(--surface); }
+  .header-left { display:flex; align-items:baseline; gap:16px; }
+  .header-logo { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; letter-spacing:.05em; }
+  .header-logo em { font-style:italic; color:var(--caramel); }
+  .header-sub { font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:var(--muted); }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--completed); display:inline-block; margin-right:6px; animation:pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .live-label { font-size:9px; letter-spacing:.2em; color:var(--completed); }
+  .db-status { font-size:9px; letter-spacing:.15em; padding:4px 10px; border:1px solid var(--border); }
+  .db-status.ok { border-color:var(--completed); color:var(--completed); }
+  .db-status.err { border-color:var(--cancelled); color:var(--cancelled); }
+  .order-link { font-size:9px; letter-spacing:.2em; color:var(--muted); text-decoration:none; }
+  .order-link:hover { color:var(--caramel); }
+
+  /* NAV TABS */
+  .nav-tabs { display:flex; border-bottom:1px solid var(--border); background:var(--surface); }
+  .nav-tab { padding:14px 28px; font-size:9px; letter-spacing:.25em; text-transform:uppercase; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; transition:all .2s; background:none; border-top:none; border-left:none; border-right:none; font-family:'DM Mono',monospace; }
+  .nav-tab:hover { color:var(--cream); }
+  .nav-tab.active { color:var(--caramel); border-bottom-color:var(--caramel); }
+
+  /* STATS BAR */
+  .stats { display:grid; grid-template-columns:repeat(5,1fr); border-bottom:1px solid var(--border); }
+  .stat { padding:18px 20px; border-right:1px solid var(--border); cursor:pointer; transition:background .2s; }
+  .stat:last-child { border-right:none; cursor:default; }
+  .stat:hover:not(:last-child) { background:rgba(196,136,62,.05); }
+  .stat.active { background:rgba(196,136,62,.08); border-bottom:2px solid var(--caramel); }
+  .stat-num { font-family:'Cormorant Garamond',serif; font-size:32px; font-weight:300; line-height:1; margin-bottom:4px; }
+  .stat-label { font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+  .stat[data-filter="pending"]   .stat-num { color:var(--pending); }
+  .stat[data-filter="accepted"]  .stat-num { color:var(--accepted); }
+  .stat[data-filter="completed"] .stat-num { color:var(--completed); }
+  .stat[data-filter="all"]       .stat-num { color:var(--cream); }
+  .revenue-num { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:300; line-height:1; margin-bottom:4px; color:var(--caramel); }
+
+  /* MAIN */
+  .main { max-width:1200px; margin:0 auto; padding:28px 24px; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  /* ORDERS PANEL */
+  .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; gap:12px; flex-wrap:wrap; }
+  .section-title { font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:var(--muted); }
+  .header-actions { display:flex; gap:8px; align-items:center; }
+  .refresh-btn { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:.2em; text-transform:uppercase; background:none; border:1px solid var(--border); color:var(--muted); padding:6px 14px; cursor:pointer; transition:all .2s; }
+  .refresh-btn:hover { border-color:var(--caramel); color:var(--caramel); }
+
+  .orders-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+  .order-card { background:var(--surface); border:1px solid var(--border); padding:20px; transition:border-color .2s; animation:fadeIn .3s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .order-card:hover { border-color:#3e3a2e; }
+  .order-card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; }
+  .order-id { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; }
+  .status-badge { font-size:8px; letter-spacing:.2em; text-transform:uppercase; padding:4px 8px; border:1px solid; }
+  .status-badge.pending   { color:var(--pending);   border-color:var(--pending); }
+  .status-badge.accepted  { color:var(--accepted);  border-color:var(--accepted); }
+  .status-badge.completed { color:var(--completed); border-color:var(--completed); }
+  .status-badge.cancelled { color:var(--cancelled); border-color:var(--cancelled); }
+  .order-meta { font-size:10px; color:var(--muted); margin-bottom:14px; display:flex; gap:12px; flex-wrap:wrap; }
+  .order-meta span::before { content:'· '; }
+  .order-meta span:first-child::before { content:''; }
+  .order-items { margin-bottom:16px; }
+  .order-item { display:flex; justify-content:space-between; font-size:11px; padding:4px 0; border-bottom:1px solid var(--border); }
+  .order-item:last-child { border-bottom:none; }
+  .item-qty { color:var(--muted); }
+  .order-total { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; padding-top:4px; }
+  .total-label { font-size:9px; letter-spacing:.2em; color:var(--muted); text-transform:uppercase; }
+  .total-val { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--caramel); }
+  .order-actions { display:flex; gap:8px; }
+  .action-btn { flex:1; padding:8px 4px; font-family:'DM Mono',monospace; font-size:8px; letter-spacing:.2em; text-transform:uppercase; border:1px solid var(--border); background:none; cursor:pointer; color:var(--muted); transition:all .15s; }
+  .action-btn:hover { border-color:var(--caramel); color:var(--caramel); }
+  .action-btn.accept  { border-color:var(--accepted);  color:var(--accepted); }
+  .action-btn.accept:hover  { background:var(--accepted);  color:var(--bg); }
+  .action-btn.complete { border-color:var(--completed); color:var(--completed); }
+  .action-btn.complete:hover { background:var(--completed); color:var(--bg); }
+  .action-btn.cancel  { border-color:var(--cancelled); color:var(--cancelled); }
+  .action-btn.cancel:hover  { background:var(--cancelled); color:var(--cream); }
+  .action-btn.del     { border-color:#3a3030; color:#664040; }
+  .action-btn.del:hover { background:#3a1e1e; color:var(--cancelled); border-color:var(--cancelled); }
+  .action-btn:disabled { opacity:.25; cursor:not-allowed; }
+  .empty-state { grid-column:1/-1; text-align:center; padding:60px; font-size:11px; letter-spacing:.2em; color:var(--muted); }
+
+  /* HISTORY PANEL */
+  .history-controls { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
+  .filter-group { display:flex; flex-direction:column; gap:6px; }
+  .filter-label { font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+  .filter-select, .filter-input {
+    background:var(--surface); border:1px solid var(--border); color:var(--cream);
+    font-family:'DM Mono',monospace; font-size:11px; padding:7px 12px; outline:none;
+    transition:border-color .2s; min-width:140px;
+  }
+  .filter-select:focus, .filter-input:focus { border-color:var(--caramel); }
+  option { background:var(--surface); }
+
+  /* HISTORY TABLE */
+  .history-table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  thead tr { border-bottom:1px solid var(--caramel); }
+  th { text-align:left; padding:10px 14px; font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--caramel); font-weight:400; white-space:nowrap; }
+  tbody tr { border-bottom:1px solid var(--border); transition:background .15s; cursor:pointer; }
+  tbody tr:hover { background:rgba(196,136,62,.04); }
+  td { padding:11px 14px; color:var(--cream); }
+  .td-id { font-family:'Cormorant Garamond',serif; font-size:17px; }
+  .td-muted { color:var(--muted); }
+  .td-amount { color:var(--caramel); font-size:13px; }
+  .expand-row { display:none; background:rgba(0,0,0,.3); }
+  .expand-row.open { display:table-row; }
+  .expand-cell { padding:0 14px 16px 36px; }
+  .expand-items { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .expand-item { background:var(--surface); border:1px solid var(--border); padding:6px 12px; font-size:10px; }
+  .expand-item .qty { color:var(--muted); }
+
+  /* PAGINATION */
+  .pagination { display:flex; gap:4px; margin-top:20px; justify-content:center; align-items:center; }
+  .page-btn { background:none; border:1px solid var(--border); color:var(--muted); font-family:'DM Mono',monospace; font-size:10px; padding:6px 12px; cursor:pointer; transition:all .2s; }
+  .page-btn:hover { border-color:var(--caramel); color:var(--caramel); }
+  .page-btn.active { background:var(--caramel); border-color:var(--caramel); color:var(--bg); }
+  .page-btn:disabled { opacity:.3; cursor:not-allowed; }
+  .page-info { font-size:9px; color:var(--muted); letter-spacing:.1em; padding:0 8px; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:28px; right:28px; background:var(--surface); border:1px solid var(--border); color:var(--cream); padding:12px 20px; font-size:10px; letter-spacing:.15em; opacity:0; transform:translateY(10px); transition:all .3s; z-index:100; }
+  .toast.show { opacity:1; transform:none; }
+  .toast.success { border-color:var(--completed); color:var(--completed); }
+  .toast.error   { border-color:var(--cancelled); color:var(--cancelled); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-logo">BRÛLÉ <em>Café</em></div>
+    <div class="header-sub">Order Management</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span><span class="live-dot"></span><span class="live-label">LIVE</span></span>
+    <span class="db-status" id="dbStatus">DB ···</span>
+    <a class="order-link" href="/">← 주문 페이지</a>
+  </div>
+</header>
+
+<!-- Nav Tabs -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="switchTab('orders')">실시간 주문</button>
+  <button class="nav-tab" onclick="switchTab('history')">주문 이력</button>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat active" data-filter="all" onclick="setFilter('all')">
+    <div class="stat-num" id="stat-all">—</div>
+    <div class="stat-label">전체 주문</div>
+  </div>
+  <div class="stat" data-filter="pending" onclick="setFilter('pending')">
+    <div class="stat-num" id="stat-pending">—</div>
+    <div class="stat-label">대기 중</div>
+  </div>
+  <div class="stat" data-filter="accepted" onclick="setFilter('accepted')">
+    <div class="stat-num" id="stat-accepted">—</div>
+    <div class="stat-label">처리 중</div>
+  </div>
+  <div class="stat" data-filter="completed" onclick="setFilter('completed')">
+    <div class="stat-num" id="stat-completed">—</div>
+    <div class="stat-label">완료</div>
+  </div>
+  <div class="stat">
+    <div class="revenue-num" id="stat-revenue">—</div>
+    <div class="stat-label">완료 매출</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ═══ ORDERS TAB ═══ -->
+  <div class="tab-panel active" id="tab-orders">
+    <div class="section-header">
+      <div class="section-title" id="sectionTitle">전체 주문</div>
+      <div class="header-actions">
+        <button class="refresh-btn" onclick="loadOrders()">↻ 새로고침</button>
+      </div>
+    </div>
+    <div class="orders-grid" id="ordersGrid">
+      <div class="empty-state">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- ═══ HISTORY TAB ═══ -->
+  <div class="tab-panel" id="tab-history">
+    <div class="section-header">
+      <div class="section-title">전체 주문 이력</div>
+      <button class="refresh-btn" onclick="loadHistory()">↻ 새로고침</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="history-controls">
+      <div class="filter-group">
+        <span class="filter-label">상태</span>
+        <select class="filter-select" id="hist-status" onchange="loadHistory()">
+          <option value="">전체</option>
+          <option value="pending">대기 중</option>
+          <option value="accepted">처리 중</option>
+          <option value="completed">완료</option>
+          <option value="cancelled">취소됨</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">성함 검색</span>
+        <input class="filter-input" id="hist-name" type="text" placeholder="홍길동" oninput="debounceHistory()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">테이블</span>
+        <input class="filter-input" id="hist-table" type="text" placeholder="1" style="width:80px" oninput="debounceHistory()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">날짜 (시작)</span>
+        <input class="filter-input" id="hist-from" type="date" onchange="loadHistory()">
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">날짜 (종료)</span>
+        <input class="filter-input" id="hist-to" type="date" onchange="loadHistory()">
+      </div>
+      <button class="refresh-btn" onclick="clearFilters()">초기화</button>
+    </div>
+
+    <!-- Table -->
+    <div class="history-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>주문번호</th>
+            <th>성함</th>
+            <th>테이블</th>
+            <th>메뉴</th>
+            <th>합계</th>
+            <th>상태</th>
+            <th>주문시각</th>
+            <th>업데이트</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">로딩 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="histPagination"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let allOrders = [];
+let currentFilter = 'all';
+let currentTab = 'orders';
+let histPage = 1;
+const HIST_PAGE_SIZE = 15;
+let histDebounce;
+let histAllRows = [];
+
+const STATUS_LABELS = { pending:'대기 중', accepted:'처리 중', completed:'완료', cancelled:'취소됨' };
+const SECTION_LABELS = { all:'전체 주문', pending:'대기 중인 주문', accepted:'처리 중인 주문', completed:'완료된 주문' };
+
+// ── Tab switch
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-tab').forEach((t,i) => t.classList.toggle('active', ['orders','history'][i] === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  if (tab === 'history') loadHistory();
+}
+
+// ── DB status
+async function checkDB() {
+  try {
+    const res = await fetch(`${API}/api/db-status`);
+    const d = await res.json();
+    const el = document.getElementById('dbStatus');
+    if (d.connected) { el.textContent = 'PostgreSQL ✓'; el.className = 'db-status ok'; }
+    else { el.textContent = 'DB 오류'; el.className = 'db-status err'; }
+  } catch { document.getElementById('dbStatus').className = 'db-status err'; }
+}
+
+// ── Stats from DB
+async function loadStats() {
+  try {
+    const res = await fetch(`${API}/api/stats`);
+    const d = await res.json();
+    if (d.success) {
+      const s = d.stats;
+      document.getElementById('stat-all').textContent       = s.total;
+      document.getElementById('stat-pending').textContent   = s.pending;
+      document.getElementById('stat-accepted').textContent  = s.accepted;
+      document.getElementById('stat-completed').textContent = s.completed;
+      document.getElementById('stat-revenue').textContent   = `₩${parseInt(s.revenue).toLocaleString()}`;
+    }
+  } catch {}
+}
+
+// ── ORDERS TAB ──
+async function loadOrders() {
+  try {
+    const res = await fetch(`${API}/api/orders`);
+    const data = await res.json();
+    allOrders = data.orders;
+    renderOrders();
+    loadStats();
+  } catch { showToast('서버 연결 오류', 'error'); }
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.stat[data-filter]').forEach(s => s.classList.remove('active'));
+  document.querySelector(`.stat[data-filter="${filter}"]`)?.classList.add('active');
+  document.getElementById('sectionTitle').textContent = SECTION_LABELS[filter] || '주문 목록';
+  renderOrders();
+}
+
+function renderOrders() {
+  const grid = document.getElementById('ordersGrid');
+  const filtered = currentFilter === 'all' ? allOrders : allOrders.filter(o => o.status === currentFilter);
+  if (!filtered.length) { grid.innerHTML = '<div class="empty-state">주문이 없습니다</div>'; return; }
+  grid.innerHTML = filtered.map(order => {
+    const time = new Date(order.createdAt).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'});
+    return `
+      <div class="order-card">
+        <div class="order-card-header">
+          <div class="order-id">${order.id}</div>
+          <div class="status-badge ${order.status}">${STATUS_LABELS[order.status]}</div>
+        </div>
+        <div class="order-meta">
+          <span>${order.customerName}</span>
+          <span>테이블 ${order.tableNumber}</span>
+          <span>${time}</span>
+        </div>
+        <div class="order-items">
+          ${order.items.map(i => `
+            <div class="order-item">
+              <span>${i.emoji} ${i.name}</span>
+              <span><span class="item-qty">×${i.quantity}</span> ₩${i.subtotal.toLocaleString()}</span>
+            </div>`).join('')}
+        </div>
+        <div class="order-total">
+          <span class="total-label">합계</span>
+          <span class="total-val">₩${order.total.toLocaleString()}</span>
+        </div>
+        <div class="order-actions">${buildActions(order)}</div>
+      </div>`;
+  }).join('');
+}
+
+function buildActions(order) {
+  const id = order.id;
+  switch (order.status) {
+    case 'pending':  return `<button class="action-btn accept"   onclick="updateStatus('${id}','accepted')">접수</button><button class="action-btn cancel" onclick="updateStatus('${id}','cancelled')">취소</button>`;
+    case 'accepted': return `<button class="action-btn complete"  onclick="updateStatus('${id}','completed')">완료</button><button class="action-btn cancel" onclick="updateStatus('${id}','cancelled')">취소</button>`;
+    case 'completed': case 'cancelled': return `<button class="action-btn del" onclick="deleteOrder('${id}')">삭제</button>`;
+    default: return '';
+  }
+}
+
+async function updateStatus(id, status) {
+  try {
+    const res = await fetch(`${API}/api/orders/${encodeURIComponent(id)}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status})
+    });
+    const data = await res.json();
+    if (data.success) {
+      const msgs = {accepted:'주문 접수됨', completed:'처리 완료', cancelled:'주문 취소됨'};
+      showToast(msgs[status] || '상태 변경됨', 'success');
+      loadOrders();
+      if (currentTab === 'history') loadHistory();
+    }
+  } catch { showToast('오류가 발생했습니다', 'error'); }
+}
+
+async function deleteOrder(id) {
+  if (!confirm('주문을 삭제할까요?')) return;
+  try {
+    const res = await fetch(`${API}/api/orders/${encodeURIComponent(id)}`, {method:'DELETE'});
+    const data = await res.json();
+    if (data.success) { showToast('삭제됨', 'success'); loadOrders(); if (currentTab==='history') loadHistory(); }
+  } catch { showToast('오류가 발생했습니다', 'error'); }
+}
+
+// ── HISTORY TAB ──
+async function loadHistory() {
+  histPage = 1;
+  const status     = document.getElementById('hist-status').value;
+  const nameQ      = document.getElementById('hist-name').value.trim();
+  const tableQ     = document.getElementById('hist-table').value.trim();
+  const fromDate   = document.getElementById('hist-from').value;
+  const toDate     = document.getElementById('hist-to').value;
+
+  try {
+    const params = new URLSearchParams();
+    if (status)   params.set('status', status);
+    const res = await fetch(`${API}/api/orders?${params}`);
+    const data = await res.json();
+
+    let rows = data.orders;
+
+    // client-side extra filters
+    if (nameQ)    rows = rows.filter(o => o.customerName.includes(nameQ));
+    if (tableQ)   rows = rows.filter(o => String(o.tableNumber) === tableQ);
+    if (fromDate) rows = rows.filter(o => o.createdAt >= fromDate);
+    if (toDate)   rows = rows.filter(o => o.createdAt.slice(0,10) <= toDate);
+
+    histAllRows = rows;
+    renderHistoryPage();
+  } catch { showToast('이력 조회 오류', 'error'); }
+}
+
+function renderHistoryPage() {
+  const total = histAllRows.length;
+  const start = (histPage - 1) * HIST_PAGE_SIZE;
+  const slice = histAllRows.slice(start, start + HIST_PAGE_SIZE);
+  const tbody = document.getElementById('historyBody');
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">조건에 맞는 주문이 없습니다</td></tr>`;
+    document.getElementById('histPagination').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = slice.map(order => {
+    const rowId = 'hr-' + order.id.replace('#','');
+    const created = new Date(order.createdAt).toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const updated = new Date(order.updatedAt).toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const summary = order.items.map(i => `${i.emoji}${i.name}×${i.quantity}`).join(', ');
+    const shortSummary = summary.length > 28 ? summary.slice(0,28) + '…' : summary;
+    return `
+      <tr onclick="toggleExpand('${rowId}')">
+        <td class="td-id">${order.id}</td>
+        <td>${order.customerName}</td>
+        <td class="td-muted">${order.tableNumber}</td>
+        <td class="td-muted" title="${summary}">${shortSummary}</td>
+        <td class="td-amount">₩${order.total.toLocaleString()}</td>
+        <td><span class="status-badge ${order.status}" style="display:inline-block">${STATUS_LABELS[order.status]}</span></td>
+        <td class="td-muted">${created}</td>
+        <td class="td-muted">${updated}</td>
+      </tr>
+      <tr class="expand-row" id="${rowId}">
+        <td class="expand-cell" colspan="8">
+          <div class="expand-items">
+            ${order.items.map(i => `
+              <div class="expand-item">${i.emoji} ${i.name} <span class="qty">× ${i.quantity}</span> — ₩${i.subtotal.toLocaleString()}</div>
+            `).join('')}
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(total / HIST_PAGE_SIZE);
+  let pgHtml = `<span class="page-info">${total}건 / ${totalPages}페이지</span>`;
+  pgHtml += `<button class="page-btn" onclick="gotoPage(${histPage-1})" ${histPage<=1?'disabled':''}>‹</button>`;
+  const range = Array.from({length: totalPages}, (_,i)=>i+1).filter(p => Math.abs(p-histPage)<=2);
+  if (range[0] > 1) pgHtml += `<button class="page-btn" onclick="gotoPage(1)">1</button>${range[0]>2?'<span class="page-info">…</span>':''}`;
+  range.forEach(p => pgHtml += `<button class="page-btn${p===histPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`);
+  if (range[range.length-1] < totalPages) pgHtml += `${range[range.length-1]<totalPages-1?'<span class="page-info">…</span>':''}<button class="page-btn" onclick="gotoPage(${totalPages})">${totalPages}</button>`;
+  pgHtml += `<button class="page-btn" onclick="gotoPage(${histPage+1})" ${histPage>=totalPages?'disabled':''}>›</button>`;
+  document.getElementById('histPagination').innerHTML = pgHtml;
+}
+
+function gotoPage(p) {
+  const totalPages = Math.ceil(histAllRows.length / HIST_PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  histPage = p;
+  renderHistoryPage();
+}
+
+function toggleExpand(rowId) {
+  const row = document.getElementById(rowId);
+  row.classList.toggle('open');
+}
+
+function clearFilters() {
+  ['hist-status','hist-name','hist-table','hist-from','hist-to'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = el.tagName === 'SELECT' ? '' : '';
+  });
+  loadHistory();
+}
+
+function debounceHistory() {
+  clearTimeout(histDebounce);
+  histDebounce = setTimeout(loadHistory, 350);
+}
+
+// ── Toast
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast show ${type}`;
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+// ── Init
+checkDB();
+loadOrders();
+setInterval(() => { loadOrders(); checkDB(); }, 8000);
+</script>
+</body>
+</html>

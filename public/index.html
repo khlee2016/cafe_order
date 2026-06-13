@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRÛLÉ CAFÉ — 주문</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f5ede0;
+    --parchment: #ede0cc;
+    --espresso: #2c1a0e;
+    --roast: #5c3317;
+    --caramel: #b97a3b;
+    --steam: #d4b896;
+    --ink: #1a0f07;
+    --mist: rgba(44,26,14,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--cream);
+    color: var(--espresso);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(185,122,59,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(92,51,23,0.08) 0%, transparent 60%);
+  }
+
+  /* ── HEADER ── */
+  header {
+    text-align: center;
+    padding: 52px 24px 36px;
+    border-bottom: 1px solid var(--steam);
+    position: relative;
+  }
+  header::before {
+    content: '';
+    position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 2px; background: var(--caramel);
+  }
+  .logo-label {
+    font-size: 10px; letter-spacing: 0.35em; color: var(--caramel);
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(42px, 7vw, 72px);
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: var(--espresso);
+  }
+  h1 em { font-style: italic; color: var(--caramel); }
+  .tagline {
+    margin-top: 10px; font-size: 10px; letter-spacing: 0.25em;
+    color: var(--steam); text-transform: uppercase;
+  }
+
+  /* ── CUSTOMER INFO ── */
+  .customer-bar {
+    max-width: 680px; margin: 32px auto 0;
+    padding: 0 24px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  }
+  .field label {
+    display: block; font-size: 9px; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--caramel); margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%; padding: 10px 14px;
+    background: rgba(255,255,255,0.5); border: 1px solid var(--steam);
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--espresso);
+    outline: none; transition: border-color 0.2s, background 0.2s;
+  }
+  .field input:focus {
+    border-color: var(--caramel); background: white;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    max-width: 680px; margin: 36px auto 0; padding: 0 24px;
+    display: flex; gap: 0;
+  }
+  .tab {
+    flex: 1; padding: 12px; text-align: center;
+    font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase;
+    cursor: pointer; border: 1px solid var(--steam);
+    background: transparent; color: var(--steam);
+    transition: all 0.2s;
+  }
+  .tab:first-child { border-right: none; }
+  .tab.active {
+    background: var(--espresso); color: var(--cream);
+    border-color: var(--espresso);
+  }
+
+  /* ── MENU GRID ── */
+  .menu-section { max-width: 680px; margin: 0 auto; padding: 24px; }
+  .menu-section.hidden { display: none; }
+
+  .menu-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  }
+  @media (min-width: 540px) { .menu-grid { grid-template-columns: repeat(3, 1fr); } }
+
+  .menu-card {
+    background: white; border: 1px solid var(--parchment);
+    padding: 18px 14px; cursor: pointer;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .menu-card::after {
+    content: ''; position: absolute; inset: 0;
+    background: var(--espresso); opacity: 0; transition: opacity 0.2s;
+  }
+  .menu-card:hover { border-color: var(--caramel); transform: translateY(-2px); }
+  .menu-card.in-cart { border-color: var(--espresso); background: var(--espresso); color: var(--cream); }
+  .menu-card.in-cart .item-price { color: var(--steam); }
+
+  .item-emoji { font-size: 28px; display: block; margin-bottom: 8px; }
+  .item-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 16px;
+    font-weight: 400; display: block; margin-bottom: 4px;
+  }
+  .item-price { font-size: 10px; color: var(--caramel); letter-spacing: 0.1em; }
+
+  /* ── CART ── */
+  .cart-section {
+    max-width: 680px; margin: 0 auto 0; padding: 0 24px 24px;
+  }
+  .cart-divider {
+    border: none; border-top: 1px solid var(--steam);
+    margin-bottom: 20px; position: relative;
+  }
+  .cart-divider::before {
+    content: 'YOUR ORDER'; position: absolute; top: -9px; left: 50%;
+    transform: translateX(-50%); background: var(--cream);
+    padding: 0 12px; font-size: 9px; letter-spacing: 0.3em; color: var(--steam);
+  }
+
+  .cart-empty {
+    text-align: center; padding: 24px;
+    font-size: 11px; color: var(--steam); letter-spacing: 0.15em;
+  }
+
+  .cart-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--mist);
+  }
+  .cart-item-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 15px; flex: 1;
+  }
+  .qty-controls {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .qty-btn {
+    width: 26px; height: 26px; border: 1px solid var(--steam);
+    background: none; cursor: pointer; font-size: 14px; color: var(--espresso);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .qty-btn:hover { background: var(--espresso); color: var(--cream); border-color: var(--espresso); }
+  .qty-num { font-size: 12px; width: 20px; text-align: center; }
+  .cart-item-price { font-size: 11px; color: var(--caramel); width: 60px; text-align: right; }
+
+  .cart-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 16px 0 0; margin-top: 4px;
+  }
+  .total-label { font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--steam); }
+  .total-amount {
+    font-family: 'Cormorant Garamond', serif; font-size: 26px;
+    color: var(--espresso);
+  }
+
+  /* ── ORDER BUTTON ── */
+  .order-btn {
+    width: 100%; margin-top: 20px; padding: 16px;
+    background: var(--espresso); color: var(--cream);
+    border: none; cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase;
+    transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .order-btn:hover { background: var(--roast); }
+  .order-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .order-btn.success { background: #2d6a4f; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--espresso); color: var(--cream);
+    padding: 14px 28px; font-size: 11px; letter-spacing: 0.2em;
+    opacity: 0; transition: all 0.35s; white-space: nowrap; z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #7a1e1e; }
+
+  /* ── ORDER RECEIPT ── */
+  .receipt-overlay {
+    position: fixed; inset: 0; background: rgba(26,15,7,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .receipt-overlay.show { opacity: 1; pointer-events: all; }
+  .receipt {
+    background: var(--cream); padding: 40px 36px; max-width: 360px; width: 90%;
+    transform: scale(0.9); transition: transform 0.3s;
+    border-top: 4px solid var(--caramel);
+  }
+  .receipt-overlay.show .receipt { transform: scale(1); }
+  .receipt h2 {
+    font-family: 'Cormorant Garamond', serif; font-size: 28px;
+    font-weight: 300; margin-bottom: 4px;
+  }
+  .receipt-id { font-size: 10px; letter-spacing: 0.25em; color: var(--caramel); margin-bottom: 20px; }
+  .receipt-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; }
+  .receipt-divider { border: none; border-top: 1px dashed var(--steam); margin: 12px 0; }
+  .receipt-total { font-family: 'Cormorant Garamond', serif; font-size: 20px; }
+  .receipt-close {
+    width: 100%; margin-top: 24px; padding: 12px;
+    background: none; border: 1px solid var(--espresso);
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 0.3em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .receipt-close:hover { background: var(--espresso); color: var(--cream); }
+
+  /* ── ADMIN LINK ── */
+  .admin-link {
+    text-align: center; padding: 20px;
+    font-size: 9px; letter-spacing: 0.25em; color: var(--steam);
+  }
+  .admin-link a { color: var(--steam); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+  .admin-link a:hover { border-color: var(--steam); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-label">Since 2024</div>
+  <h1>BRÛLÉ <em>Café</em></h1>
+  <div class="tagline">Artisan Coffee &amp; Fine Teas</div>
+</header>
+
+<!-- Customer Info -->
+<div class="customer-bar">
+  <div class="field">
+    <label>성함</label>
+    <input type="text" id="customerName" placeholder="홍길동">
+  </div>
+  <div class="field">
+    <label>테이블 번호</label>
+    <input type="number" id="tableNumber" placeholder="1" min="1">
+  </div>
+</div>
+
+<!-- Category Tabs -->
+<div class="tabs">
+  <button class="tab active" data-cat="coffee">☕ 커피</button>
+  <button class="tab" data-cat="tea">🍵 차</button>
+</div>
+
+<!-- Menu -->
+<div class="menu-section" id="menu-coffee"></div>
+<div class="menu-section hidden" id="menu-tea"></div>
+
+<!-- Cart -->
+<div class="cart-section">
+  <hr class="cart-divider">
+  <div id="cartList"><div class="cart-empty">메뉴를 선택해주세요</div></div>
+  <div class="cart-total">
+    <span class="total-label">합계</span>
+    <span class="total-amount" id="totalAmount">₩0</span>
+  </div>
+  <button class="order-btn" id="orderBtn" onclick="submitOrder()">주문하기</button>
+</div>
+
+<div class="admin-link"><a href="/admin">관리자 페이지 →</a></div>
+
+<!-- Receipt Modal -->
+<div class="receipt-overlay" id="receiptOverlay">
+  <div class="receipt">
+    <h2>주문 완료</h2>
+    <div class="receipt-id" id="receiptId"></div>
+    <div id="receiptItems"></div>
+    <hr class="receipt-divider">
+    <div class="receipt-row">
+      <span>합계</span>
+      <span class="receipt-total" id="receiptTotal"></span>
+    </div>
+    <button class="receipt-close" onclick="closeReceipt()">닫기</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let menu = {};
+let cart = {}; // { id: { ...menuItem, quantity } }
+
+// ── Load menu
+async function loadMenu() {
+  const res = await fetch(`${API}/api/menu`);
+  const data = await res.json();
+  menu = data.menu;
+  renderMenu('coffee');
+  renderMenu('tea');
+}
+
+function renderMenu(cat) {
+  const section = document.getElementById(`menu-${cat}`);
+  section.innerHTML = `<div class="menu-grid">${
+    menu[cat].map(item => `
+      <div class="menu-card" id="card-${item.id}" onclick="toggleItem(${JSON.stringify(item).replace(/"/g,'&quot;')})">
+        <span class="item-emoji">${item.emoji}</span>
+        <span class="item-name">${item.name}</span>
+        <span class="item-price">₩${item.price.toLocaleString()}</span>
+      </div>
+    `).join('')
+  }</div>`;
+}
+
+// ── Tabs
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.menu-section').forEach(s => s.classList.add('hidden'));
+    document.getElementById(`menu-${btn.dataset.cat}`).classList.remove('hidden');
+  });
+});
+
+// ── Cart logic
+function toggleItem(item) {
+  if (cart[item.id]) {
+    delete cart[item.id];
+    document.getElementById(`card-${item.id}`)?.classList.remove('in-cart');
+  } else {
+    cart[item.id] = { ...item, quantity: 1 };
+    document.getElementById(`card-${item.id}`)?.classList.add('in-cart');
+  }
+  renderCart();
+}
+
+function changeQty(id, delta) {
+  if (!cart[id]) return;
+  cart[id].quantity += delta;
+  if (cart[id].quantity <= 0) {
+    delete cart[id];
+    document.getElementById(`card-${id}`)?.classList.remove('in-cart');
+  }
+  renderCart();
+}
+
+function renderCart() {
+  const list = document.getElementById('cartList');
+  const items = Object.values(cart);
+  if (items.length === 0) {
+    list.innerHTML = '<div class="cart-empty">메뉴를 선택해주세요</div>';
+    document.getElementById('totalAmount').textContent = '₩0';
+    return;
+  }
+  list.innerHTML = items.map(item => `
+    <div class="cart-item">
+      <span class="cart-item-name">${item.emoji} ${item.name}</span>
+      <div class="qty-controls">
+        <button class="qty-btn" onclick="changeQty('${item.id}', -1)">−</button>
+        <span class="qty-num">${item.quantity}</span>
+        <button class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+      </div>
+      <span class="cart-item-price">₩${(item.price * item.quantity).toLocaleString()}</span>
+    </div>
+  `).join('');
+  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  document.getElementById('totalAmount').textContent = `₩${total.toLocaleString()}`;
+}
+
+// ── Submit order
+async function submitOrder() {
+  const customerName = document.getElementById('customerName').value.trim();
+  const tableNumber = document.getElementById('tableNumber').value.trim();
+  if (!customerName) { showToast('성함을 입력해주세요', true); return; }
+  const items = Object.values(cart);
+  if (items.length === 0) { showToast('메뉴를 선택해주세요', true); return; }
+
+  const btn = document.getElementById('orderBtn');
+  btn.disabled = true; btn.textContent = '처리 중...';
+
+  try {
+    const res = await fetch(`${API}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName,
+        tableNumber,
+        items: items.map(i => ({ id: i.id, quantity: i.quantity }))
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showReceipt(data.order);
+      cart = {};
+      document.querySelectorAll('.menu-card.in-cart').forEach(c => c.classList.remove('in-cart'));
+      renderCart();
+    } else {
+      showToast(data.message, true);
+    }
+  } catch (e) {
+    showToast('서버 오류가 발생했습니다', true);
+  } finally {
+    btn.disabled = false; btn.textContent = '주문하기';
+  }
+}
+
+// ── Receipt
+function showReceipt(order) {
+  document.getElementById('receiptId').textContent = `주문번호 ${order.id} · ${order.customerName} · 테이블 ${order.tableNumber}`;
+  document.getElementById('receiptItems').innerHTML = order.items.map(i =>
+    `<div class="receipt-row"><span>${i.name} × ${i.quantity}</span><span>₩${i.subtotal.toLocaleString()}</span></div>`
+  ).join('');
+  document.getElementById('receiptTotal').textContent = `₩${order.total.toLocaleString()}`;
+  document.getElementById('receiptOverlay').classList.add('show');
+}
+function closeReceipt() {
+  document.getElementById('receiptOverlay').classList.remove('show');
+}
+
+// ── Toast
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show${isError ? ' error' : ''}`;
+  setTimeout(() => t.className = 'toast', 2800);
+}
+
+loadMenu();
+</script>
+</body>
+</html>
